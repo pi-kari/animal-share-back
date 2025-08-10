@@ -79,6 +79,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const userId = req.user?.claims?.sub;
 
+      // @ts-ignore
       const post = await storage.getPost(id, userId);
 
       if (!post) {
