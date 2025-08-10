@@ -13,6 +13,9 @@ app.use(
     credentials: true,
   })
 );
+app.get("/", (req, res) => {
+  res.send("This is Animal Share Backend Server");
+});
 registerRoutes(app);
 
 export default app;
