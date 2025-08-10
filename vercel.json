@@ -10,7 +10,7 @@
     {
       "src": "/.*",
       "dest": "/dist/index.js",
-      "methods": ["GET", "POST"]
+      "methods": ["GET", "POST", "DELETE"]
     }
   ]
 }
