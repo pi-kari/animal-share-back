@@ -4,6 +4,9 @@ import { storage } from "./storage";
 import { insertPostSchema, insertTagSchema } from "./schema";
 import { z } from "zod";
 import { setupAuth, isAuthenticated } from "./auth";
+import dotenv from "dotenv";
+import { multerMemoryStorage } from ".";
+dotenv.config({ path: ".env" });
 
 const createPostWithTagsSchema = insertPostSchema
   .omit({ userId: true })
@@ -262,6 +265,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.error("Error removing exclude tag:", error);
         res.status(500).json({ message: "Failed to remove exclude tag" });
+      }
+    }
+  );
+
+  app.post(
+    "/api/upload",
+    isAuthenticated,
+    multerMemoryStorage.single("file"),
+    async (req, res) => {
+      const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+      const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
+      if (!cloudName || !uploadPreset)
+        throw new Error("Cloudinary configuration missing");
+
+      try {
+        // multerが処理したファイルはreq.fileにある
+        const fileBuffer = req.file?.buffer;
+        if (!fileBuffer) throw new Error("No file uploaded");
+
+        const formData = new FormData();
+        const blob = new Blob([new Uint8Array(fileBuffer)], {
+          type: req.file?.mimetype!,
+        });
+
+        formData.append("file", blob, req.file?.originalname);
+        formData.append("upload_preset", uploadPreset);
+
+        const res_ = await fetch(
+          `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+          { method: "POST", body: formData }
+        );
+        if (!res_.ok) throw new Error("Failed to upload image");
+        const data = await res_.json();
+
+        res.json({ ok: true, secure_url: data.secure_url });
+      } catch (error) {
+        res.status(500).json({ ok: false, message: "Failed to upload image" });
       }
     }
   );
