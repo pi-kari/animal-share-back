@@ -20,6 +20,7 @@ export async function setupAuth(app: Express) {
 
   app.use(
     session({
+      proxy: true,
       store: new PgSession({
         pool: pool,
         tableName: "sessions", // 既存スキーマに合わせる
