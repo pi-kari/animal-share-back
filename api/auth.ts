@@ -12,6 +12,12 @@ const PgSession = connectPgSimple(session);
 
 export async function setupAuth(app: Express) {
   // Session middleware (store in Postgres table 'sessions' to match your schema)
+
+  // 環境変数の検証
+  if (!process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET is required");
+  }
+
   app.use(
     session({
       store: new PgSession({
@@ -26,6 +32,7 @@ export async function setupAuth(app: Express) {
         maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
         httpOnly: true,
         sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
       },
     })
   );

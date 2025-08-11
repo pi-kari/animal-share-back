@@ -69,15 +69,16 @@ export class DatabaseStorage implements IStorage {
       .insert(users)
       .values(userData)
       .onConflictDoUpdate({
-        target: users.email,
+        target: users.email, // 👈 email を一意キーとして upsert
         set: {
-          ...userData,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          profileImageUrl: userData.profileImageUrl,
           updatedAt: new Date(),
         },
       })
       .returning();
-    // @ts-ignore
-    return user;
+    return user!;
   }
 
   async getAllTags(): Promise<Tag[]> {
@@ -111,92 +112,6 @@ export class DatabaseStorage implements IStorage {
     return await this.createTag({ name, category });
   }
 
-  // @ts-ignore
-  async getPosts(
-    limit: number = 20,
-    offset: number = 0,
-    tagIds?: string[],
-    userId?: string
-  ): Promise<PostWithTags[]> {
-    let query = db
-      .select({
-        post: posts,
-        user: users,
-        tag: tags,
-        isFavorited: sql<boolean>`CASE WHEN ${favorites.userId} IS NOT NULL THEN true ELSE false END`,
-      })
-      .from(posts)
-      .leftJoin(users, eq(posts.userId, users.id))
-      .leftJoin(postTags, eq(posts.id, postTags.postId))
-      .leftJoin(tags, eq(postTags.tagId, tags.id))
-      .leftJoin(
-        favorites,
-        userId
-          ? and(eq(favorites.postId, posts.id), eq(favorites.userId, userId))
-          : undefined
-      );
-
-    // Apply tag filtering (AND search)
-    if (tagIds && tagIds.length > 0) {
-      const postsWithAllTags = db
-        .select({ postId: postTags.postId })
-        .from(postTags)
-        .where(inArray(postTags.tagId, tagIds))
-        .groupBy(postTags.postId)
-        .having(eq(count(), tagIds.length));
-
-      // @ts-ignore
-      query = query.where(inArray(posts.id, postsWithAllTags));
-    }
-
-    // Apply user exclusion tags (zoning)
-    if (userId) {
-      const excludedTagIds = db
-        .select({ tagId: userExcludeTags.tagId })
-        .from(userExcludeTags)
-        .where(eq(userExcludeTags.userId, userId));
-
-      const postsWithExcludedTags = db
-        .select({ postId: postTags.postId })
-        .from(postTags)
-        .where(inArray(postTags.tagId, excludedTagIds));
-
-      // @ts-ignore
-      query = query.where(notInArray(posts.id, postsWithExcludedTags));
-    }
-
-    const results = await query
-      .orderBy(desc(posts.createdAt))
-      .limit(limit)
-      .offset(offset);
-
-    // Group results by post
-    const postsMap = new Map<string, PostWithTags>();
-
-    for (const result of results) {
-      const postId = result.post.id;
-
-      if (!postsMap.has(postId)) {
-        postsMap.set(postId, {
-          ...result.post,
-          user: result.user!,
-          tags: [],
-          isFavorited: result.isFavorited,
-        });
-      }
-
-      if (result.tag) {
-        const existingPost = postsMap.get(postId)!;
-        if (!existingPost.tags.some((t) => t.id === result.tag!.id)) {
-          existingPost.tags.push(result.tag);
-        }
-      }
-    }
-
-    return Array.from(postsMap.values());
-  }
-
-  // 変更点：isFavoritedExpr を定義し、userId がある場合のみ leftJoin する
   // @ts-ignore
   async getPosts(
     limit: number = 20,

@@ -1,22 +1,26 @@
 import express from "express";
 import cors from "cors";
 import { registerRoutes } from "./routes";
+import dotenv from "dotenv";
+dotenv.config({ path: ".env" });
 
-require("dotenv").config({ path: ".env" });
+const port = Number(process.env.BACKEND_PORT);
 
-const app = express();
-app.use(express.static("public"));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL,
-    credentials: true,
-  })
-);
-app.get("/", (req, res) => {
-  res.send("This is Animal Share Backend Server");
-});
-registerRoutes(app);
-app.listen(3000, () => console.log("Server ready on port 3000."));
-module.exports = app;
+async function main() {
+  const app = express();
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  app.use(
+    cors({
+      origin: process.env.FRONTEND_URL ?? "http://localhost:3000/",
+      credentials: true,
+    })
+  );
+  registerRoutes(app);
+
+  app.listen(port, async () => {
+    console.log(`Server is running on port ${port}`);
+  });
+}
+
+main();
