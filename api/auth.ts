@@ -25,14 +25,14 @@ export async function setupAuth(app: Express) {
         pool: pool,
         tableName: "sessions", // 既存スキーマに合わせる
       }) as any,
-      secret: process.env.SESSION_SECRET ?? "",
+      secret: process.env.SESSION_SECRET ?? "something",
       resave: false,
       saveUninitialized: false,
       cookie: {
         // 必要に応じて調整
         maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
         httpOnly: true,
-        sameSite: "none",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         secure: process.env.NODE_ENV === "production",
       },
     })
@@ -114,7 +114,6 @@ export async function setupAuth(app: Express) {
   // ログアウト
   app.post("/api/auth/logout", (req: any, res) => {
     req.logout((err: any) => {
-      // ignore err
       req.session?.destroy(() => {
         res.json({ success: true });
       });

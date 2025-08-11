@@ -69,7 +69,7 @@ export class DatabaseStorage implements IStorage {
       .insert(users)
       .values(userData)
       .onConflictDoUpdate({
-        target: users.email, // 👈 email を一意キーとして upsert
+        target: users.email,
         set: {
           firstName: userData.firstName,
           lastName: userData.lastName,
@@ -202,6 +202,56 @@ export class DatabaseStorage implements IStorage {
     }
 
     return Array.from(postsMap.values());
+  }
+
+  async getPost(
+    id: string,
+    userId?: string
+  ): Promise<PostWithTags | undefined> {
+    const isFavoritedExpr = userId
+      ? sql<boolean>`CASE WHEN ${favorites.userId} IS NOT NULL THEN true ELSE false END`
+      : sql<boolean>`false`;
+
+    let query = db
+      .select({
+        post: posts,
+        user: users,
+        tag: tags,
+        isFavorited: isFavoritedExpr,
+      })
+      .from(posts)
+      .leftJoin(users, eq(posts.userId, users.id))
+      .leftJoin(postTags, eq(posts.id, postTags.postId))
+      .leftJoin(tags, eq(postTags.tagId, tags.id));
+
+    if (userId) {
+      query = query.leftJoin(
+        favorites,
+        and(eq(favorites.postId, posts.id), eq(favorites.userId, userId))
+      );
+    }
+
+    query = query.where(eq(posts.id, id));
+
+    const results = await query;
+
+    if (results.length === 0) return undefined;
+
+    const postId = results[0].post.id;
+    const postWithTags: PostWithTags = {
+      ...results[0].post,
+      user: results[0].user!,
+      tags: [],
+      isFavorited: results[0].isFavorited,
+    };
+
+    for (const row of results) {
+      if (row.tag && !postWithTags.tags.some((t) => t.id === row.tag.id)) {
+        postWithTags.tags.push(row.tag);
+      }
+    }
+
+    return postWithTags;
   }
 
   async createPost(post: InsertPost, tagIds: string[]): Promise<Post> {

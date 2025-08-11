@@ -1,7 +1,7 @@
-import type { Express, RequestHandler } from "express";
+import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertPostSchema, insertTagSchema, Tag } from "./schema";
+import { insertPostSchema, insertTagSchema } from "./schema";
 import { z } from "zod";
 import { setupAuth, isAuthenticated } from "./auth";
 
@@ -79,7 +79,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const userId = req.user?.claims?.sub;
 
-      // @ts-ignore
       const post = await storage.getPost(id, userId);
 
       if (!post) {
@@ -229,7 +228,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 修正前の箇所を置き換える
   app.post("/api/exclude-tags", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
