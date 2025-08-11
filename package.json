@@ -4,11 +4,8 @@
   "description": "",
   "main": "index.ts",
   "scripts": {
-    "build": "npx tsc",
-    "start": "node api/index.ts",
-    "serve": "npx tsc -w & nodemon dist/index.js",
-    "db:generate": "npx drizzle-kit generate --config drizzle.config.ts",
-    "db:push": "npx drizzle-kit push --config drizzle.config.ts"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node api/index.ts"
   },
   "keywords": [],
   "author": "",
