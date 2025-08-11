@@ -2,10 +2,10 @@
   "name": "back",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "index.ts",
   "scripts": {
     "build": "npx tsc",
-    "start": "node dist/src/index.js",
+    "start": "node src/index.ts",
     "serve": "npx tsc -w & nodemon dist/index.js",
     "db:generate": "npx drizzle-kit generate --config drizzle.config.ts",
     "db:push": "npx drizzle-kit push --config drizzle.config.ts"
