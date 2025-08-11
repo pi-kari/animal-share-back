@@ -31,7 +31,7 @@ export async function setupAuth(app: Express) {
         // 必要に応じて調整
         maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
         httpOnly: true,
-        sameSite: "lax",
+        sameSite: "none",
         secure: process.env.NODE_ENV === "production",
       },
     })
