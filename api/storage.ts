@@ -117,7 +117,8 @@ export class DatabaseStorage implements IStorage {
     limit: number = 20,
     offset: number = 0,
     tagIds?: string[],
-    userId?: string
+    userId?: string,
+    excludeTagIds?: string[] // ← 追加
   ): Promise<PostWithTags[]> {
     const isFavoritedExpr = userId
       ? sql<boolean>`CASE WHEN ${favorites.userId} IS NOT NULL THEN true ELSE false END`
@@ -143,7 +144,6 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
-    // （以降は既存ロジックをそのまま）
     // タグでの AND フィルタ
     if (tagIds && tagIds.length > 0) {
       const postsWithAllTags = db
@@ -157,20 +157,31 @@ export class DatabaseStorage implements IStorage {
       query = query.where(inArray(posts.id, postsWithAllTags));
     }
 
-    // ユーザーの除外タグ（ゾーニング）
+    // フロントから渡された除外タグ（excludeTagIds）でフィルタ
+    if (excludeTagIds && excludeTagIds.length > 0) {
+      const postsWithExcludedTags = db
+        .select({ postId: postTags.postId })
+        .from(postTags)
+        .where(inArray(postTags.tagId, excludeTagIds));
+
+      // @ts-ignore
+      query = query.where(notInArray(posts.id, postsWithExcludedTags));
+    }
+
+    // また、ユーザーが自身で設定した除外タグ（userExcludeTags テーブル）もサポート（既存のロジック）
     if (userId) {
       const excludedTagIds = db
         .select({ tagId: userExcludeTags.tagId })
         .from(userExcludeTags)
         .where(eq(userExcludeTags.userId, userId));
 
-      const postsWithExcludedTags = db
+      const postsWithUserExcludedTags = db
         .select({ postId: postTags.postId })
         .from(postTags)
         .where(inArray(postTags.tagId, excludedTagIds));
 
       // @ts-ignore
-      query = query.where(notInArray(posts.id, postsWithExcludedTags));
+      query = query.where(notInArray(posts.id, postsWithUserExcludedTags));
     }
 
     const results = await query
@@ -178,7 +189,7 @@ export class DatabaseStorage implements IStorage {
       .limit(limit)
       .offset(offset);
 
-    // （後続の集計ロジックはそのまま）
+    // Grouping/collect tags (既存ロジックをそのまま)
     const postsMap = new Map<string, PostWithTags>();
 
     for (const result of results) {
@@ -376,6 +387,22 @@ export class DatabaseStorage implements IStorage {
       .where(eq(userExcludeTags.userId, userId));
 
     return results.map((r) => r.tag!).filter(Boolean);
+  }
+
+  // replace user's exclude tags with given array (transactional)
+  async setUserExcludeTags(userId: string, tagIds: string[]): Promise<void> {
+    await db.transaction(async (tx) => {
+      // delete existing
+      await tx
+        .delete(userExcludeTags)
+        .where(eq(userExcludeTags.userId, userId));
+      if (tagIds.length > 0) {
+        await tx
+          .insert(userExcludeTags)
+          .values(tagIds.map((tagId) => ({ userId, tagId })))
+          .onConflictDoNothing();
+      }
+    });
   }
 
   async validatePostTags(tagIds: string[]): Promise<boolean> {

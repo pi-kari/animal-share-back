@@ -54,7 +54,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Posts routes
   app.get("/api/posts", async (req: any, res) => {
     try {
-      const { limit = 20, offset = 0, tagIds } = req.query;
+      const { limit = 20, offset = 0, tagIds, excludeTagIds } = req.query;
 
       const userId = req.user?.claims?.sub;
       const parsedTagIds = tagIds
@@ -63,11 +63,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : [tagIds]
         : undefined;
 
+      const parsedExcludeTagIds = excludeTagIds
+        ? Array.isArray(excludeTagIds)
+          ? excludeTagIds
+          : [excludeTagIds]
+        : undefined;
+
       const posts = await storage.getPosts(
         parseInt(limit),
         parseInt(offset),
         parsedTagIds,
-        userId
+        userId,
+        parsedExcludeTagIds // ← ここで渡す
       );
 
       res.json(posts);
@@ -234,17 +241,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/exclude-tags", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { tagIds } = req.body as { tagIds: string[] };
-
-      if (!Array.isArray(tagIds) || tagIds.length === 0) {
+      const { tagIds } = req.body as { tagIds?: string[] };
+      if (!Array.isArray(tagIds)) {
         return res.status(400).json({ message: "tagIds is required" });
       }
-
-      for (const tagId of tagIds) {
-        if (typeof tagId !== "string" || tagId.trim() === "") continue;
-        await storage.addExcludeTag(userId, tagId);
-      }
-
+      // Use new storage method to atomically replace user's exclude tags
+      await storage.setUserExcludeTags(userId, tagIds);
       res.json({ success: true });
     } catch (error) {
       console.error("Error adding exclude tags:", error);
